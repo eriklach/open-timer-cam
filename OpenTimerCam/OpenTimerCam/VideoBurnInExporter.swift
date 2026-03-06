@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import ImageIO
 import UIKit
 
 struct VideoBurnInExporter {
@@ -9,6 +10,10 @@ struct VideoBurnInExporter {
         inputURL: URL,
         timerStartOffset: TimeInterval?,
         timerDuration: TimeInterval,
+<<<<<<< codex/fix-timer-setup-and-playback-issues-mmfsib
+        recordedOrientation: AVCaptureVideoOrientation?,
+=======
+>>>>>>> firstUpdates
         corner: TimerOverlayCorner
     ) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
@@ -19,9 +24,16 @@ struct VideoBurnInExporter {
         }
 
         let videoDuration = try await asset.load(.duration)
+        let loadedTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let sourceNaturalSize = try await sourceVideoTrack.load(.naturalSize)
+        let effectiveOrientation = resolvedOrientation(
+            loadedTransform: loadedTransform,
+            naturalSize: sourceNaturalSize,
+            recordedOrientation: recordedOrientation
+        )
         let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
         try videoTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: sourceVideoTrack, at: .zero)
-        videoTrack?.preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        videoTrack?.preferredTransform = .identity
 
         if let sourceAudioTrack = try await asset.loadTracks(withMediaType: .audio).first {
             let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
@@ -30,18 +42,20 @@ struct VideoBurnInExporter {
 
         let renderer = TimerOverlayRenderer(corner: corner)
         let safeTimerOffset = timerStartOffset ?? .greatestFiniteMagnitude
-        let renderSize = normalizedRenderSize(
-            naturalSize: try await sourceVideoTrack.load(.naturalSize),
-            transform: try await sourceVideoTrack.load(.preferredTransform)
-        )
+        let renderSize = renderSize(for: sourceNaturalSize, orientation: effectiveOrientation)
+        let videoBounds = CGRect(origin: .zero, size: renderSize)
+        let exifOrientation = cgOrientation(for: effectiveOrientation)
 
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
-            let sourceImage = request.sourceImage.clampedToExtent()
+            let rotatedImage = request.sourceImage.oriented(exifOrientation)
+            let sourceImage = rotatedImage
+                .transformed(by: .init(translationX: -rotatedImage.extent.minX, y: -rotatedImage.extent.minY))
+                .cropped(to: videoBounds)
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
 
             let badge = renderer.makeOverlayImage(text: text, canvasSize: renderSize)
-            let result = badge.composited(over: sourceImage).cropped(to: request.sourceImage.extent)
+            let result = badge.composited(over: sourceImage).cropped(to: videoBounds)
             request.finish(with: result, context: nil)
         }
 
@@ -73,9 +87,81 @@ struct VideoBurnInExporter {
         return outputURL
     }
 
-    private func normalizedRenderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {
-        let rect = CGRect(origin: .zero, size: naturalSize).applying(transform)
-        return CGSize(width: abs(rect.width), height: abs(rect.height))
+    private func resolvedOrientation(
+        loadedTransform: CGAffineTransform,
+        naturalSize: CGSize,
+        recordedOrientation: AVCaptureVideoOrientation?
+    ) -> AVCaptureVideoOrientation {
+        let transformedOrientation = inferredOrientation(from: loadedTransform)
+
+        if let recordedOrientation,
+           let transformedOrientation,
+           isPortrait(recordedOrientation),
+           isPortrait(transformedOrientation),
+           recordedOrientation != transformedOrientation {
+            return recordedOrientation
+        }
+
+        if let transformedOrientation {
+            return transformedOrientation
+        }
+
+        if let recordedOrientation {
+            return recordedOrientation
+        }
+
+        if naturalSize.height > naturalSize.width {
+            return .portrait
+        }
+
+        return .landscapeRight
+    }
+
+    private func renderSize(for naturalSize: CGSize, orientation: AVCaptureVideoOrientation) -> CGSize {
+        if isPortrait(orientation) {
+            return CGSize(width: naturalSize.height, height: naturalSize.width)
+        }
+
+        return naturalSize
+    }
+
+    private func cgOrientation(for orientation: AVCaptureVideoOrientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .portrait:
+            return .right
+        case .portraitUpsideDown:
+            return .left
+        case .landscapeLeft:
+            return .down
+        case .landscapeRight:
+            return .up
+        @unknown default:
+            return .up
+        }
+    }
+
+    private func isPortrait(_ orientation: AVCaptureVideoOrientation) -> Bool {
+        orientation == .portrait || orientation == .portraitUpsideDown
+    }
+
+    private func inferredOrientation(from transform: CGAffineTransform) -> AVCaptureVideoOrientation? {
+        let a = Int(round(transform.a))
+        let b = Int(round(transform.b))
+        let c = Int(round(transform.c))
+        let d = Int(round(transform.d))
+
+        switch (a, b, c, d) {
+        case (0, 1, -1, 0):
+            return .portrait
+        case (0, -1, 1, 0):
+            return .portraitUpsideDown
+        case (1, 0, 0, 1):
+            return .landscapeRight
+        case (-1, 0, 0, -1):
+            return .landscapeLeft
+        default:
+            return nil
+        }
     }
 }
 
@@ -85,6 +171,34 @@ enum ExportError: Error {
 }
 
 final class TimerOverlayRenderer {
+    private struct BadgeStyle: Hashable {
+        let width: Int
+        let height: Int
+        let cornerRadius: Int
+        let fontSize: Int
+        let textYOffset: Int
+
+        var size: CGSize {
+            CGSize(width: width, height: height)
+        }
+
+        static func `for`(canvasSize: CGSize) -> BadgeStyle {
+            let width = max(110, min(230, Int(canvasSize.width * 0.19)))
+            let height = max(46, min(86, Int(Double(width) * 0.44)))
+            let cornerRadius = max(10, Int(Double(height) * 0.24))
+            let fontSize = max(24, Int(Double(height) * 0.56))
+            let textYOffset = max(5, Int(Double(height) * 0.18))
+
+            return BadgeStyle(
+                width: width,
+                height: height,
+                cornerRadius: cornerRadius,
+                fontSize: fontSize,
+                textYOffset: textYOffset
+            )
+        }
+    }
+
     private let corner: TimerOverlayCorner
     private var cache: [String: CIImage] = [:]
 
@@ -93,23 +207,26 @@ final class TimerOverlayRenderer {
     }
 
     func makeOverlayImage(text: String, canvasSize: CGSize) -> CIImage {
-        let badge = cachedBadge(text: text)
+        let style = BadgeStyle.for(canvasSize: canvasSize)
+        let badge = cachedBadge(text: text, style: style)
         let position = corner.position(badgeSize: badge.extent.size, canvasSize: canvasSize)
         return badge.transformed(by: .init(translationX: position.x, y: position.y))
     }
 
-    private func cachedBadge(text: String) -> CIImage {
-        if let cached = cache[text] {
+    private func cachedBadge(text: String, style: BadgeStyle) -> CIImage {
+        let cacheKey = "\(style.width)x\(style.height)-\(style.fontSize)-\(text)"
+
+        if let cached = cache[cacheKey] {
             return cached
         }
 
-        let badgeSize = CGSize(width: 88, height: 36)
+        let badgeSize = style.size
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
 
         let image = UIGraphicsImageRenderer(size: badgeSize, format: format).image { _ in
             let backgroundRect = CGRect(origin: .zero, size: badgeSize)
-            UIBezierPath(roundedRect: backgroundRect, cornerRadius: 8).addClip()
+            UIBezierPath(roundedRect: backgroundRect, cornerRadius: CGFloat(style.cornerRadius)).addClip()
             UIColor.black.withAlphaComponent(0.65).setFill()
             UIRectFill(backgroundRect)
 
@@ -117,12 +234,17 @@ final class TimerOverlayRenderer {
             paragraph.alignment = .center
 
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.monospacedDigitSystemFont(ofSize: 20, weight: .semibold),
+                .font: UIFont.monospacedDigitSystemFont(ofSize: CGFloat(style.fontSize), weight: .semibold),
                 .foregroundColor: UIColor.white,
                 .paragraphStyle: paragraph,
             ]
 
-            let textRect = CGRect(x: 0, y: 7, width: badgeSize.width, height: badgeSize.height - 8)
+            let textRect = CGRect(
+                x: 0,
+                y: CGFloat(style.textYOffset),
+                width: badgeSize.width,
+                height: badgeSize.height - CGFloat(style.textYOffset + 4)
+            )
             (text as NSString).draw(in: textRect, withAttributes: attributes)
         }
 
@@ -131,7 +253,7 @@ final class TimerOverlayRenderer {
         }
 
         let ci = CIImage(cgImage: cgImage)
-        cache[text] = ci
+        cache[cacheKey] = ci
         return ci
     }
 }
