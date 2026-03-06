@@ -5,6 +5,7 @@ import Combine
 final class TimerManager: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var elapsedSeconds: TimeInterval = 0
+    @Published private(set) var configuredDuration: TimeInterval = 0
 
     private var timer: Timer?
     private var startedAt: Date?
@@ -12,7 +13,13 @@ final class TimerManager: ObservableObject {
     var timerStartOffsetFromRecording: TimeInterval?
 
     var displayString: String {
-        Self.formatTime(elapsedSeconds)
+        let remaining = max(0, configuredDuration - elapsedSeconds)
+        return Self.formatTime(remaining)
+    }
+
+    func configureDuration(_ duration: TimeInterval) {
+        configuredDuration = max(0, duration)
+        elapsedSeconds = 0
     }
 
     func startTimer(recordingStartedAt: Date?) {
@@ -54,6 +61,13 @@ final class TimerManager: ObservableObject {
         }
 
         elapsedSeconds = max(0, Date().timeIntervalSince(startedAt))
+
+        if elapsedSeconds >= configuredDuration {
+            elapsedSeconds = configuredDuration
+            timer?.invalidate()
+            timer = nil
+            isRunning = false
+        }
     }
 
     nonisolated static func formatTime(_ seconds: TimeInterval) -> String {
@@ -61,5 +75,9 @@ final class TimerManager: ObservableObject {
         let minutes = value / 60
         let secs = value % 60
         return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    nonisolated static func formatCountdown(elapsed: TimeInterval, duration: TimeInterval) -> String {
+        formatTime(max(0, duration - elapsed))
     }
 }
