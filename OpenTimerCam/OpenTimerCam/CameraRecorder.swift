@@ -25,12 +25,12 @@ final class CameraRecorder: NSObject, ObservableObject {
     @Published private(set) var isSessionRunning = false
     @Published private(set) var isRecording = false
 
-    let session = AVCaptureSession()
+    nonisolated(unsafe) let session = AVCaptureSession()
 
-    private let movieOutput = AVCaptureMovieFileOutput()
-    private let sessionQueue = DispatchQueue(label: "OpenTimerCam.session.queue")
-    private var videoInput: AVCaptureDeviceInput?
-    private var audioInput: AVCaptureDeviceInput?
+    nonisolated(unsafe) private let movieOutput = AVCaptureMovieFileOutput()
+    nonisolated(unsafe) private let sessionQueue = DispatchQueue(label: "OpenTimerCam.session.queue")
+    nonisolated(unsafe) private var videoInput: AVCaptureDeviceInput?
+    nonisolated(unsafe) private var audioInput: AVCaptureDeviceInput?
 
     private var continuation: CheckedContinuation<URL, Error>?
     private(set) var recordingStartedAt: Date?
@@ -81,7 +81,7 @@ final class CameraRecorder: NSObject, ObservableObject {
         sessionQueue.async {
             guard !self.session.isRunning else { return }
             self.session.startRunning()
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isSessionRunning = self.session.isRunning
             }
         }
@@ -91,7 +91,7 @@ final class CameraRecorder: NSObject, ObservableObject {
         sessionQueue.async {
             guard self.session.isRunning else { return }
             self.session.stopRunning()
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isSessionRunning = self.session.isRunning
             }
         }
@@ -122,7 +122,7 @@ final class CameraRecorder: NSObject, ObservableObject {
     }
 
     func saveToPhotos(_ fileURL: URL) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
             } completionHandler: { success, error in
@@ -141,15 +141,32 @@ final class CameraRecorder: NSObject, ObservableObject {
     }
 
     private func updateVideoOrientation() {
-        guard let connection = movieOutput.connection(with: .video), connection.isVideoOrientationSupported else {
+        guard let connection = movieOutput.connection(with: .video) else {
             return
         }
 
-        connection.videoOrientation = switch UIDevice.current.orientation {
-        case .landscapeLeft: .landscapeRight
-        case .landscapeRight: .landscapeLeft
-        case .portraitUpsideDown: .portraitUpsideDown
-        default: .portrait
+        if #available(iOS 17.0, *) {
+            let angle: CGFloat = switch UIDevice.current.orientation {
+            case .landscapeLeft: 270
+            case .landscapeRight: 90
+            case .portraitUpsideDown: 180
+            default: 0
+            }
+
+            if connection.isVideoRotationAngleSupported(angle) {
+                connection.videoRotationAngle = angle
+            }
+        } else {
+            guard connection.isVideoOrientationSupported else {
+                return
+            }
+
+            connection.videoOrientation = switch UIDevice.current.orientation {
+            case .landscapeLeft: .landscapeRight
+            case .landscapeRight: .landscapeLeft
+            case .portraitUpsideDown: .portraitUpsideDown
+            default: .portrait
+            }
         }
     }
 }
