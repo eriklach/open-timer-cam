@@ -148,18 +148,16 @@ final class CameraRecorder: NSObject, ObservableObject {
 
         let targetOrientation = currentVideoOrientation()
 
+        if connection.isVideoOrientationSupported {
+            connection.videoOrientation = targetOrientation
+            return targetOrientation
+        }
+
         if #available(iOS 17.0, *) {
             let angle = rotationAngle(for: targetOrientation)
-
             if connection.isVideoRotationAngleSupported(angle) {
                 connection.videoRotationAngle = angle
             }
-        } else {
-            guard connection.isVideoOrientationSupported else {
-                return targetOrientation
-            }
-
-            connection.videoOrientation = targetOrientation
         }
 
         return targetOrientation

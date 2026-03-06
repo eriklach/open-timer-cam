@@ -43,12 +43,23 @@ struct VideoBurnInExporter {
             transform: sourceTransform
         )
         let videoBounds = CGRect(origin: .zero, size: renderSize)
+        let shouldFlipUpright = shouldFlipUpsideDown(
+            recordedOrientation: recordedOrientation,
+            transform: sourceTransform
+        )
 
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
             let orientedImage = request.sourceImage.transformed(by: sourceTransform)
-            let sourceImage = orientedImage
+            var sourceImage = orientedImage
                 .transformed(by: .init(translationX: -orientedImage.extent.minX, y: -orientedImage.extent.minY))
                 .cropped(to: videoBounds)
+
+            if shouldFlipUpright {
+                sourceImage = sourceImage
+                    .transformed(by: .init(translationX: renderSize.width, y: renderSize.height))
+                    .transformed(by: .init(rotationAngle: .pi))
+                    .cropped(to: videoBounds)
+            }
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
 
@@ -125,6 +136,44 @@ struct VideoBurnInExporter {
             return .identity
         @unknown default:
             return .identity
+        }
+    }
+
+    private func shouldFlipUpsideDown(
+        recordedOrientation: AVCaptureVideoOrientation?,
+        transform: CGAffineTransform
+    ) -> Bool {
+        guard let recordedOrientation,
+              isPortrait(recordedOrientation),
+              let inferred = inferredOrientation(from: transform),
+              isPortrait(inferred) else {
+            return false
+        }
+
+        return recordedOrientation != inferred
+    }
+
+    private func isPortrait(_ orientation: AVCaptureVideoOrientation) -> Bool {
+        orientation == .portrait || orientation == .portraitUpsideDown
+    }
+
+    private func inferredOrientation(from transform: CGAffineTransform) -> AVCaptureVideoOrientation? {
+        let a = Int(round(transform.a))
+        let b = Int(round(transform.b))
+        let c = Int(round(transform.c))
+        let d = Int(round(transform.d))
+
+        switch (a, b, c, d) {
+        case (0, 1, -1, 0):
+            return .portrait
+        case (0, -1, 1, 0):
+            return .portraitUpsideDown
+        case (1, 0, 0, 1):
+            return .landscapeRight
+        case (-1, 0, 0, -1):
+            return .landscapeLeft
+        default:
+            return nil
         }
     }
 }
