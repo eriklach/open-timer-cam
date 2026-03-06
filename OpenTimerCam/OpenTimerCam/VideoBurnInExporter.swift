@@ -29,22 +29,23 @@ struct VideoBurnInExporter {
 
         let renderer = TimerOverlayRenderer(corner: corner)
         let safeTimerOffset = timerStartOffset ?? .greatestFiniteMagnitude
+        let renderSize = normalizedRenderSize(
+            naturalSize: try await sourceVideoTrack.load(.naturalSize),
+            transform: try await sourceVideoTrack.load(.preferredTransform)
+        )
 
         let videoComposition = AVVideoComposition(asset: composition) { request in
             let sourceImage = request.sourceImage.clampedToExtent()
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatTime(elapsed)
 
-            let badge = renderer.makeOverlayImage(text: text, canvasSize: request.renderContext.size)
+            let badge = renderer.makeOverlayImage(text: text, canvasSize: renderSize)
             let result = badge.composited(over: sourceImage).cropped(to: request.sourceImage.extent)
             request.finish(with: result, context: nil)
         }
 
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
-        videoComposition.renderSize = normalizedRenderSize(
-            naturalSize: try await sourceVideoTrack.load(.naturalSize),
-            transform: try await sourceVideoTrack.load(.preferredTransform)
-        )
+        videoComposition.renderSize = renderSize
 
         guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw ExportError.unableToCreateSession
@@ -54,14 +55,18 @@ struct VideoBurnInExporter {
             .appendingPathComponent("final-\(UUID().uuidString).mov")
 
         exportSession.videoComposition = videoComposition
-        exportSession.outputFileType = .mov
-        exportSession.outputURL = outputURL
         exportSession.shouldOptimizeForNetworkUse = false
 
-        try await exportSession.export()
+        if #available(iOS 18.0, *) {
+            try await exportSession.export(to: outputURL, as: .mov)
+        } else {
+            exportSession.outputFileType = .mov
+            exportSession.outputURL = outputURL
+            try await exportSession.exportCompat()
 
-        if let error = exportSession.error {
-            throw error
+            if let error = exportSession.error {
+                throw error
+            }
         }
 
         return outputURL

@@ -1,6 +1,7 @@
 import AVFoundation
 import Photos
 import SwiftUI
+import Combine
 
 @MainActor
 final class CameraScreenViewModel: ObservableObject {

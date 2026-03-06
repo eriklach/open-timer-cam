@@ -1,6 +1,7 @@
 import AVFoundation
 import UIKit
 import Photos
+import Combine
 
 @MainActor
 final class CameraRecorder: NSObject, ObservableObject {

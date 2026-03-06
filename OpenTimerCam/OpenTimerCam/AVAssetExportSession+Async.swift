@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 extension AVAssetExportSession {
-    func export() async throws {
+    func exportCompat() async throws {
         try await withCheckedThrowingContinuation { continuation in
             exportAsynchronously {
                 switch self.status {
