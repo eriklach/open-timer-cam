@@ -37,14 +37,11 @@ struct VideoBurnInExporter {
             transform: sourceTransform
         )
         let videoBounds = CGRect(origin: .zero, size: renderSize)
-        let drawTransform = drawTransformForOrientedVideo(
-            naturalSize: sourceNaturalSize,
-            preferredTransform: sourceTransform
-        )
 
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
-            let sourceImage = request.sourceImage
-                .transformed(by: drawTransform)
+            let orientedImage = request.sourceImage.transformed(by: sourceTransform)
+            let sourceImage = orientedImage
+                .transformed(by: .init(translationX: -orientedImage.extent.minX, y: -orientedImage.extent.minY))
                 .cropped(to: videoBounds)
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
@@ -85,18 +82,6 @@ struct VideoBurnInExporter {
     private func normalizedRenderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {
         let rect = CGRect(origin: .zero, size: naturalSize).applying(transform)
         return CGSize(width: abs(rect.width), height: abs(rect.height))
-    }
-
-    private func drawTransformForOrientedVideo(
-        naturalSize: CGSize,
-        preferredTransform: CGAffineTransform
-    ) -> CGAffineTransform {
-        let transformedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
-        let translateToOrigin = CGAffineTransform(
-            translationX: -transformedRect.minX,
-            y: -transformedRect.minY
-        )
-        return preferredTransform.concatenating(translateToOrigin)
     }
 }
 

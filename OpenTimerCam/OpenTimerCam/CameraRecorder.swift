@@ -145,13 +145,10 @@ final class CameraRecorder: NSObject, ObservableObject {
             return
         }
 
+        let targetOrientation = currentVideoOrientation()
+
         if #available(iOS 17.0, *) {
-            let angle: CGFloat = switch UIDevice.current.orientation {
-            case .landscapeLeft: 270
-            case .landscapeRight: 90
-            case .portraitUpsideDown: 180
-            default: 0
-            }
+            let angle = rotationAngle(for: targetOrientation)
 
             if connection.isVideoRotationAngleSupported(angle) {
                 connection.videoRotationAngle = angle
@@ -161,12 +158,60 @@ final class CameraRecorder: NSObject, ObservableObject {
                 return
             }
 
-            connection.videoOrientation = switch UIDevice.current.orientation {
-            case .landscapeLeft: .landscapeRight
-            case .landscapeRight: .landscapeLeft
-            case .portraitUpsideDown: .portraitUpsideDown
-            default: .portrait
-            }
+            connection.videoOrientation = targetOrientation
+        }
+    }
+
+    private func currentVideoOrientation() -> AVCaptureVideoOrientation {
+        if let interfaceOrientation = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })?
+            .interfaceOrientation {
+            return videoOrientation(from: interfaceOrientation)
+        }
+
+        return videoOrientation(from: UIDevice.current.orientation)
+    }
+
+    private func videoOrientation(from interfaceOrientation: UIInterfaceOrientation) -> AVCaptureVideoOrientation {
+        switch interfaceOrientation {
+        case .landscapeLeft:
+            return .landscapeLeft
+        case .landscapeRight:
+            return .landscapeRight
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        default:
+            return .portrait
+        }
+    }
+
+    private func videoOrientation(from deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation {
+        switch deviceOrientation {
+        case .landscapeLeft:
+            return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        default:
+            return .portrait
+        }
+    }
+
+    @available(iOS 17.0, *)
+    private func rotationAngle(for orientation: AVCaptureVideoOrientation) -> CGFloat {
+        switch orientation {
+        case .portrait:
+            return 0
+        case .landscapeRight:
+            return 90
+        case .portraitUpsideDown:
+            return 180
+        case .landscapeLeft:
+            return 270
+        @unknown default:
+            return 0
         }
     }
 }
