@@ -3,16 +3,17 @@ import SwiftUI
 struct CameraScreenView: View {
     @StateObject private var viewModel: CameraScreenViewModel
 
-    init(corner: TimerOverlayCorner) {
-        _viewModel = StateObject(wrappedValue: CameraScreenViewModel(corner: corner))
+    init(corner: TimerOverlayCorner, timerDuration: TimeInterval) {
+        _viewModel = StateObject(wrappedValue: CameraScreenViewModel(corner: corner, timerDuration: timerDuration))
     }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             CameraPreviewView(session: viewModel.recorder.session)
                 .ignoresSafeArea()
 
             timerOverlay
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: viewModel.corner.alignment)
                 .padding(16)
 
             controls
@@ -56,12 +57,6 @@ struct CameraScreenView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.recorder.isRecording)
-
-                Button("Start Timer") {
-                    viewModel.startTimer()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.recorder.isRecording || viewModel.timerManager.isRunning)
 
                 Button("Stop Recording") {
                     Task { await viewModel.stopRecording() }

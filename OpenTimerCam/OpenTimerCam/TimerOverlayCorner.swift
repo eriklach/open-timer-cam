@@ -1,4 +1,5 @@
 import CoreGraphics
+import SwiftUI
 
 enum TimerOverlayCorner: String, CaseIterable, Identifiable {
     case topLeading
@@ -14,6 +15,17 @@ enum TimerOverlayCorner: String, CaseIterable, Identifiable {
         case .topTrailing: "Top Right"
         case .bottomLeading: "Bottom Left"
         case .bottomTrailing: "Bottom Right"
+        }
+    }
+
+
+
+    var alignment: Alignment {
+        switch self {
+        case .topLeading: .topLeading
+        case .topTrailing: .topTrailing
+        case .bottomLeading: .bottomLeading
+        case .bottomTrailing: .bottomTrailing
         }
     }
 

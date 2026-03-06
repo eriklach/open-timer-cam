@@ -8,7 +8,8 @@ struct VideoBurnInExporter {
     func exportVideoWithTimer(
         inputURL: URL,
         timerStartOffset: TimeInterval?,
-        corner: TimerOverlayCorner
+        corner: TimerOverlayCorner,
+        timerDuration: TimeInterval
     ) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
         let composition = AVMutableComposition()
@@ -20,7 +21,6 @@ struct VideoBurnInExporter {
         let videoDuration = try await asset.load(.duration)
         let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
         try videoTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: sourceVideoTrack, at: .zero)
-        videoTrack?.preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
 
         if let sourceAudioTrack = try await asset.loadTracks(withMediaType: .audio).first {
             let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
@@ -29,18 +29,24 @@ struct VideoBurnInExporter {
 
         let renderer = TimerOverlayRenderer(corner: corner)
         let safeTimerOffset = timerStartOffset ?? .greatestFiniteMagnitude
+        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
         let renderSize = normalizedRenderSize(
             naturalSize: try await sourceVideoTrack.load(.naturalSize),
-            transform: try await sourceVideoTrack.load(.preferredTransform)
+            transform: preferredTransform
         )
 
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
             let sourceImage = request.sourceImage.clampedToExtent()
+            let transformed = sourceImage.transformed(by: preferredTransform)
+            let oriented = transformed.transformed(by: .init(translationX: -transformed.extent.origin.x, y: -transformed.extent.origin.y))
+
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
-            let text = TimerManager.formatTime(elapsed)
+            let remaining = max(0, timerDuration - elapsed)
+            let text = TimerManager.formatTime(remaining)
 
             let badge = renderer.makeOverlayImage(text: text, canvasSize: renderSize)
-            let result = badge.composited(over: sourceImage).cropped(to: request.sourceImage.extent)
+            let canvas = CGRect(origin: .zero, size: renderSize)
+            let result = badge.composited(over: oriented).cropped(to: canvas)
             request.finish(with: result, context: nil)
         }
 

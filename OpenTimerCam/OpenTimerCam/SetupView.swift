@@ -2,7 +2,10 @@ import SwiftUI
 
 struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
+    @Binding var selectedDuration: TimeInterval
     let onContinue: () -> Void
+
+    private let durationOptions: [TimeInterval] = [15, 30, 45, 60, 90, 120, 180, 300, 600]
 
     var body: some View {
         Form {
@@ -13,7 +16,13 @@ struct SetupView: View {
                     }
                 }
 
-                Text("Timer format: mm:ss (counts up from 00:00)")
+                Picker("Timer Duration", selection: $selectedDuration) {
+                    ForEach(durationOptions, id: \.self) { duration in
+                        Text(durationLabel(duration)).tag(duration)
+                    }
+                }
+
+                Text("Timer format: mm:ss (countdown)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -24,5 +33,12 @@ struct SetupView: View {
             }
         }
         .navigationTitle("Open Timer Cam")
+    }
+
+    private func durationLabel(_ duration: TimeInterval) -> String {
+        let totalSeconds = Int(duration)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 }

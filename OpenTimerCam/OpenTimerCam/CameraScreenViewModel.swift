@@ -9,13 +9,14 @@ final class CameraScreenViewModel: ObservableObject {
     @Published var permissionDeniedMessage: String?
 
     let recorder = CameraRecorder()
-    let timerManager = TimerManager()
+    let timerManager: TimerManager
 
     private let exporter = VideoBurnInExporter()
-    private let corner: TimerOverlayCorner
+    let corner: TimerOverlayCorner
 
-    init(corner: TimerOverlayCorner) {
+    init(corner: TimerOverlayCorner, timerDuration: TimeInterval) {
         self.corner = corner
+        self.timerManager = TimerManager(timerDuration: timerDuration)
     }
 
     func setup() async {
@@ -37,12 +38,8 @@ final class CameraScreenViewModel: ObservableObject {
     func startRecording() {
         timerManager.reset()
         recorder.startRecording()
-        statusMessage = "Recording..."
-    }
-
-    func startTimer() {
         timerManager.startTimer(recordingStartedAt: recorder.recordingStartedAt)
-        statusMessage = "Timer running"
+        statusMessage = "Recording..."
     }
 
     func stopRecording() async {
@@ -56,7 +53,8 @@ final class CameraScreenViewModel: ObservableObject {
             let finalURL = try await exporter.exportVideoWithTimer(
                 inputURL: rawURL,
                 timerStartOffset: timerManager.timerStartOffsetFromRecording,
-                corner: corner
+                corner: corner,
+                timerDuration: timerManager.timerDuration
             )
             try await recorder.saveToPhotos(finalURL)
             statusMessage = "Saved to Photos"
