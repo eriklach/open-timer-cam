@@ -34,8 +34,7 @@ struct VideoBurnInExporter {
             transform: try await sourceVideoTrack.load(.preferredTransform)
         )
 
-        let videoComposition = AVVideoComposition(asset: composition) { request in
-            let sourceImage = request.sourceImage.clampedToExtent()
+        let videoComposition = AVMutableVideoComposition(asset: composition) { request in            let sourceImage = request.sourceImage.clampedToExtent()
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatTime(elapsed)
 
