@@ -56,7 +56,8 @@ final class TimerManager: ObservableObject {
         elapsedSeconds = max(0, Date().timeIntervalSince(startedAt))
     }
 
-    nonisolated static func formatTime(_ seconds: TimeInterval) -> String {        let value = Int(seconds)
+    nonisolated static func formatTime(_ seconds: TimeInterval) -> String {
+        let value = Int(seconds)
         let minutes = value / 60
         let secs = value % 60
         return String(format: "%02d:%02d", minutes, secs)
