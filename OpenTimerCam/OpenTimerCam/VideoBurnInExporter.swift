@@ -8,6 +8,7 @@ struct VideoBurnInExporter {
     func exportVideoWithTimer(
         inputURL: URL,
         timerStartOffset: TimeInterval?,
+        timerDuration: TimeInterval,
         corner: TimerOverlayCorner
     ) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
@@ -37,7 +38,7 @@ struct VideoBurnInExporter {
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
             let sourceImage = request.sourceImage.clampedToExtent()
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
-            let text = TimerManager.formatTime(elapsed)
+            let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
 
             let badge = renderer.makeOverlayImage(text: text, canvasSize: renderSize)
             let result = badge.composited(over: sourceImage).cropped(to: request.sourceImage.extent)

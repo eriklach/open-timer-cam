@@ -3,8 +3,10 @@ import SwiftUI
 struct CameraScreenView: View {
     @StateObject private var viewModel: CameraScreenViewModel
 
-    init(corner: TimerOverlayCorner) {
-        _viewModel = StateObject(wrappedValue: CameraScreenViewModel(corner: corner))
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval) {
+        _viewModel = StateObject(
+            wrappedValue: CameraScreenViewModel(corner: corner, countdownDuration: countdownDuration)
+        )
     }
 
     var body: some View {
@@ -25,10 +27,25 @@ struct CameraScreenView: View {
         } message: {
             Text(viewModel.permissionDeniedMessage ?? "")
         }
+        .confirmationDialog(
+            "Save recording?",
+            isPresented: $viewModel.shouldPresentSaveDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Save") {
+                Task { await viewModel.savePendingRecording() }
+            }
+
+            Button("Discard", role: .destructive) {
+                viewModel.discardPendingRecording()
+            }
+
+            Button("Cancel", role: .cancel) { }
+        }
     }
 
     private var timerOverlay: some View {
-        Text(viewModel.timerManager.displayString)
+        Text(viewModel.timerDisplayString)
             .font(.system(size: 22, weight: .semibold, design: .monospaced))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
@@ -55,7 +72,7 @@ struct CameraScreenView: View {
                     viewModel.startRecording()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.recorder.isRecording)
+                .disabled(viewModel.recorder.isRecording || viewModel.pendingExportURL != nil)
 
                 Button("Start Timer") {
                     viewModel.startTimer()
@@ -68,7 +85,7 @@ struct CameraScreenView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
-                .disabled(!viewModel.recorder.isRecording)
+                .disabled(!viewModel.recorder.isRecording || viewModel.pendingExportURL != nil)
             }
             .padding()
             .background(.ultraThinMaterial)
