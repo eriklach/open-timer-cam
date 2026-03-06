@@ -7,15 +7,27 @@ import Combine
 final class CameraScreenViewModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var permissionDeniedMessage: String?
+    @Published var timerDisplayString = "00:00"
+    @Published var pendingExportURL: URL?
+    @Published var shouldPresentSaveDialog = false
 
     let recorder = CameraRecorder()
     let timerManager = TimerManager()
 
     private let exporter = VideoBurnInExporter()
     private let corner: TimerOverlayCorner
+    private var cancellables = Set<AnyCancellable>()
 
-    init(corner: TimerOverlayCorner) {
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval) {
         self.corner = corner
+        timerManager.configureDuration(countdownDuration)
+        timerDisplayString = timerManager.displayString
+
+        Publishers.CombineLatest(timerManager.$elapsedSeconds, timerManager.$configuredDuration)
+            .sink { [weak self] elapsed, duration in
+                self?.timerDisplayString = TimerManager.formatCountdown(elapsed: elapsed, duration: duration)
+            }
+            .store(in: &cancellables)
     }
 
     func setup() async {
@@ -36,6 +48,7 @@ final class CameraScreenViewModel: ObservableObject {
 
     func startRecording() {
         timerManager.reset()
+        timerDisplayString = timerManager.displayString
         recorder.startRecording()
         statusMessage = "Recording..."
     }
@@ -56,13 +69,38 @@ final class CameraScreenViewModel: ObservableObject {
             let finalURL = try await exporter.exportVideoWithTimer(
                 inputURL: rawURL,
                 timerStartOffset: timerManager.timerStartOffsetFromRecording,
+                timerDuration: timerManager.configuredDuration,
                 corner: corner
             )
-            try await recorder.saveToPhotos(finalURL)
+            try? FileManager.default.removeItem(at: rawURL)
+            pendingExportURL = finalURL
+            shouldPresentSaveDialog = true
+            statusMessage = "Recording ready"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func savePendingRecording() async {
+        guard let pendingExportURL else { return }
+
+        do {
+            try await recorder.saveToPhotos(pendingExportURL)
+            try? FileManager.default.removeItem(at: pendingExportURL)
+            self.pendingExportURL = nil
+            shouldPresentSaveDialog = false
             statusMessage = "Saved to Photos"
         } catch {
             statusMessage = error.localizedDescription
         }
+    }
+
+    func discardPendingRecording() {
+        guard let pendingExportURL else { return }
+        try? FileManager.default.removeItem(at: pendingExportURL)
+        self.pendingExportURL = nil
+        shouldPresentSaveDialog = false
+        statusMessage = "Recording discarded"
     }
 
     private func requestPermissions() async -> Bool {
