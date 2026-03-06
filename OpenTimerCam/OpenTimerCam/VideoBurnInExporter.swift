@@ -9,6 +9,7 @@ struct VideoBurnInExporter {
         inputURL: URL,
         timerStartOffset: TimeInterval?,
         timerDuration: TimeInterval,
+        recordedOrientation: AVCaptureVideoOrientation?,
         corner: TimerOverlayCorner
     ) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
@@ -19,8 +20,13 @@ struct VideoBurnInExporter {
         }
 
         let videoDuration = try await asset.load(.duration)
-        let sourceTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let loadedTransform = try await sourceVideoTrack.load(.preferredTransform)
         let sourceNaturalSize = try await sourceVideoTrack.load(.naturalSize)
+        let sourceTransform = resolvedSourceTransform(
+            loadedTransform: loadedTransform,
+            naturalSize: sourceNaturalSize,
+            recordedOrientation: recordedOrientation
+        )
         let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
         try videoTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: sourceVideoTrack, at: .zero)
         videoTrack?.preferredTransform = .identity
@@ -82,6 +88,44 @@ struct VideoBurnInExporter {
     private func normalizedRenderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {
         let rect = CGRect(origin: .zero, size: naturalSize).applying(transform)
         return CGSize(width: abs(rect.width), height: abs(rect.height))
+    }
+
+    private func resolvedSourceTransform(
+        loadedTransform: CGAffineTransform,
+        naturalSize: CGSize,
+        recordedOrientation: AVCaptureVideoOrientation?
+    ) -> CGAffineTransform {
+        guard loadedTransform.isIdentity else {
+            return loadedTransform
+        }
+
+        guard let recordedOrientation else {
+            return loadedTransform
+        }
+
+        let isNaturalPortrait = naturalSize.height > naturalSize.width
+        let needsPortrait = recordedOrientation == .portrait || recordedOrientation == .portraitUpsideDown
+
+        if needsPortrait == isNaturalPortrait {
+            return loadedTransform
+        }
+
+        return transform(for: recordedOrientation, naturalSize: naturalSize)
+    }
+
+    private func transform(for orientation: AVCaptureVideoOrientation, naturalSize: CGSize) -> CGAffineTransform {
+        switch orientation {
+        case .portrait:
+            return CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: naturalSize.height, ty: 0)
+        case .portraitUpsideDown:
+            return CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: naturalSize.width)
+        case .landscapeLeft:
+            return CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: naturalSize.width, ty: naturalSize.height)
+        case .landscapeRight:
+            return .identity
+        @unknown default:
+            return .identity
+        }
     }
 }
 

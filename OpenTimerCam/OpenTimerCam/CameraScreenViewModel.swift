@@ -70,6 +70,7 @@ final class CameraScreenViewModel: ObservableObject {
                 inputURL: rawURL,
                 timerStartOffset: timerManager.timerStartOffsetFromRecording,
                 timerDuration: timerManager.configuredDuration,
+                recordedOrientation: recorder.lastRecordingOrientation,
                 corner: corner
             )
             try? FileManager.default.removeItem(at: rawURL)

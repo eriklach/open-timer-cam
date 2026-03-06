@@ -34,6 +34,7 @@ final class CameraRecorder: NSObject, ObservableObject {
 
     private var continuation: CheckedContinuation<URL, Error>?
     private(set) var recordingStartedAt: Date?
+    private(set) var lastRecordingOrientation: AVCaptureVideoOrientation?
 
     func configureSession() async throws {
         try await withCheckedThrowingContinuation { cont in
@@ -103,7 +104,7 @@ final class CameraRecorder: NSObject, ObservableObject {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("raw-\(UUID().uuidString).mov")
 
-        updateVideoOrientation()
+        lastRecordingOrientation = updateVideoOrientation()
         recordingStartedAt = Date()
         movieOutput.startRecording(to: url, recordingDelegate: self)
         isRecording = true
@@ -140,9 +141,9 @@ final class CameraRecorder: NSObject, ObservableObject {
         }
     }
 
-    private func updateVideoOrientation() {
+    private func updateVideoOrientation() -> AVCaptureVideoOrientation {
         guard let connection = movieOutput.connection(with: .video) else {
-            return
+            return .portrait
         }
 
         let targetOrientation = currentVideoOrientation()
@@ -155,11 +156,13 @@ final class CameraRecorder: NSObject, ObservableObject {
             }
         } else {
             guard connection.isVideoOrientationSupported else {
-                return
+                return targetOrientation
             }
 
             connection.videoOrientation = targetOrientation
         }
+
+        return targetOrientation
     }
 
     private func currentVideoOrientation() -> AVCaptureVideoOrientation {
