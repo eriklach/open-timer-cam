@@ -2,11 +2,15 @@ import SwiftUI
 
 struct CameraScreenView: View {
     @StateObject private var viewModel: CameraScreenViewModel
+    let onBackToSetup: () -> Void
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval) {
+    @State private var shouldConfirmLeaving = false
+
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, onBackToSetup: @escaping () -> Void) {
         _viewModel = StateObject(
             wrappedValue: CameraScreenViewModel(corner: corner, countdownDuration: countdownDuration)
         )
+        self.onBackToSetup = onBackToSetup
     }
 
     var body: some View {
@@ -26,6 +30,22 @@ struct CameraScreenView: View {
             Button("OK") { viewModel.permissionDeniedMessage = nil }
         } message: {
             Text(viewModel.permissionDeniedMessage ?? "")
+        }
+        .alert("Leave timer setup?", isPresented: $shouldConfirmLeaving) {
+            Button("Stay", role: .cancel) { }
+            Button("Leave", role: .destructive) {
+                onBackToSetup()
+            }
+        } message: {
+            Text("Are you sure you want to leave this page?")
+        }
+        .alert("End recording?", isPresented: $viewModel.shouldConfirmStopRecording) {
+            Button("Cancel", role: .cancel) { }
+            Button("Stop Recording", role: .destructive) {
+                Task { await viewModel.stopRecording() }
+            }
+        } message: {
+            Text("Are you sure you want to end the recording?")
         }
         .confirmationDialog(
             "Save recording?",
@@ -68,29 +88,49 @@ struct CameraScreenView: View {
             }
 
             HStack(spacing: 12) {
+                Button("Back") {
+                    shouldConfirmLeaving = true
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.recorder.isRecording)
+
                 Button("Start Recording") {
                     viewModel.startRecording()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.recorder.isRecording || viewModel.pendingExportURL != nil)
+                .tint(canStartRecording ? .red : .gray)
+                .disabled(!canStartRecording)
 
                 Button("Start Timer") {
                     viewModel.startTimer()
                 }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.recorder.isRecording || viewModel.timerManager.isRunning)
+                .buttonStyle(.borderedProminent)
+                .tint(canStartTimer ? .orange : .gray)
+                .disabled(!canStartTimer)
 
                 Button("Stop Recording") {
-                    Task { await viewModel.stopRecording() }
+                    viewModel.requestStopRecordingConfirmation()
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .disabled(!viewModel.recorder.isRecording || viewModel.pendingExportURL != nil)
+                .buttonStyle(.borderedProminent)
+                .tint(canStopRecording ? .red : .gray)
+                .disabled(!canStopRecording)
             }
             .padding()
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding()
         }
+    }
+
+    private var canStartRecording: Bool {
+        !viewModel.recorder.isRecording && viewModel.pendingExportURL == nil
+    }
+
+    private var canStartTimer: Bool {
+        viewModel.recorder.isRecording && !viewModel.timerManager.isRunning && !viewModel.timerManager.isInPrestartCountdown
+    }
+
+    private var canStopRecording: Bool {
+        viewModel.recorder.isRecording && viewModel.pendingExportURL == nil
     }
 }

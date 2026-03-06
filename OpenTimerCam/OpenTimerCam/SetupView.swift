@@ -3,23 +3,14 @@ import SwiftUI
 struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
     @Binding var timerMinutes: Int
-    @Binding var timerSeconds: Int
     let onContinue: () -> Void
 
     var body: some View {
         Form {
             Section("Timer Setup") {
-                HStack {
-                    Picker("Minutes", selection: $timerMinutes) {
-                        ForEach(0...59, id: \.self) { minute in
-                            Text("\(minute) min").tag(minute)
-                        }
-                    }
-
-                    Picker("Seconds", selection: $timerSeconds) {
-                        ForEach(0...59, id: \.self) { second in
-                            Text(String(format: "%02d sec", second)).tag(second)
-                        }
+                Picker("Minutes", selection: $timerMinutes) {
+                    ForEach(0...59, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
                     }
                 }
 
@@ -29,7 +20,7 @@ struct SetupView: View {
                     }
                 }
 
-                Text("Timer format: mm:ss countdown")
+                Text("Timer format: m:ss count up")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
