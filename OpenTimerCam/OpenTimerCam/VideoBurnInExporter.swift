@@ -10,7 +10,10 @@ struct VideoBurnInExporter {
         inputURL: URL,
         timerStartOffset: TimeInterval?,
         timerDuration: TimeInterval,
+<<<<<<< codex/fix-timer-setup-and-playback-issues-mmfsib
         recordedOrientation: AVCaptureVideoOrientation?,
+=======
+>>>>>>> firstUpdates
         corner: TimerOverlayCorner
     ) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
