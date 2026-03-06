@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import ImageIO
 import UIKit
 
 struct VideoBurnInExporter {
@@ -22,7 +23,7 @@ struct VideoBurnInExporter {
         let videoDuration = try await asset.load(.duration)
         let loadedTransform = try await sourceVideoTrack.load(.preferredTransform)
         let sourceNaturalSize = try await sourceVideoTrack.load(.naturalSize)
-        let sourceTransform = resolvedSourceTransform(
+        let effectiveOrientation = resolvedOrientation(
             loadedTransform: loadedTransform,
             naturalSize: sourceNaturalSize,
             recordedOrientation: recordedOrientation
@@ -38,28 +39,15 @@ struct VideoBurnInExporter {
 
         let renderer = TimerOverlayRenderer(corner: corner)
         let safeTimerOffset = timerStartOffset ?? .greatestFiniteMagnitude
-        let renderSize = normalizedRenderSize(
-            naturalSize: sourceNaturalSize,
-            transform: sourceTransform
-        )
+        let renderSize = renderSize(for: sourceNaturalSize, orientation: effectiveOrientation)
         let videoBounds = CGRect(origin: .zero, size: renderSize)
-        let shouldFlipUpright = shouldFlipUpsideDown(
-            recordedOrientation: recordedOrientation,
-            transform: sourceTransform
-        )
+        let exifOrientation = cgOrientation(for: effectiveOrientation)
 
         let videoComposition = AVMutableVideoComposition(asset: composition) { request in
-            let orientedImage = request.sourceImage.transformed(by: sourceTransform)
-            var sourceImage = orientedImage
-                .transformed(by: .init(translationX: -orientedImage.extent.minX, y: -orientedImage.extent.minY))
+            let rotatedImage = request.sourceImage.oriented(exifOrientation)
+            let sourceImage = rotatedImage
+                .transformed(by: .init(translationX: -rotatedImage.extent.minX, y: -rotatedImage.extent.minY))
                 .cropped(to: videoBounds)
-
-            if shouldFlipUpright {
-                sourceImage = sourceImage
-                    .transformed(by: .init(translationX: renderSize.width, y: renderSize.height))
-                    .transformed(by: .init(rotationAngle: .pi))
-                    .cropped(to: videoBounds)
-            }
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
             let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
 
@@ -96,61 +84,57 @@ struct VideoBurnInExporter {
         return outputURL
     }
 
-    private func normalizedRenderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {
-        let rect = CGRect(origin: .zero, size: naturalSize).applying(transform)
-        return CGSize(width: abs(rect.width), height: abs(rect.height))
-    }
-
-    private func resolvedSourceTransform(
+    private func resolvedOrientation(
         loadedTransform: CGAffineTransform,
         naturalSize: CGSize,
         recordedOrientation: AVCaptureVideoOrientation?
-    ) -> CGAffineTransform {
-        guard loadedTransform.isIdentity else {
-            return loadedTransform
+    ) -> AVCaptureVideoOrientation {
+        let transformedOrientation = inferredOrientation(from: loadedTransform)
+
+        if let recordedOrientation,
+           let transformedOrientation,
+           isPortrait(recordedOrientation),
+           isPortrait(transformedOrientation),
+           recordedOrientation != transformedOrientation {
+            return recordedOrientation
         }
 
-        guard let recordedOrientation else {
-            return loadedTransform
+        if let transformedOrientation {
+            return transformedOrientation
         }
 
-        let isNaturalPortrait = naturalSize.height > naturalSize.width
-        let needsPortrait = recordedOrientation == .portrait || recordedOrientation == .portraitUpsideDown
-
-        if needsPortrait == isNaturalPortrait {
-            return loadedTransform
+        if let recordedOrientation {
+            return recordedOrientation
         }
 
-        return transform(for: recordedOrientation, naturalSize: naturalSize)
+        if naturalSize.height > naturalSize.width {
+            return .portrait
+        }
+
+        return .landscapeRight
     }
 
-    private func transform(for orientation: AVCaptureVideoOrientation, naturalSize: CGSize) -> CGAffineTransform {
+    private func renderSize(for naturalSize: CGSize, orientation: AVCaptureVideoOrientation) -> CGSize {
+        if isPortrait(orientation) {
+            return CGSize(width: naturalSize.height, height: naturalSize.width)
+        }
+
+        return naturalSize
+    }
+
+    private func cgOrientation(for orientation: AVCaptureVideoOrientation) -> CGImagePropertyOrientation {
         switch orientation {
         case .portrait:
-            return CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: naturalSize.height, ty: 0)
+            return .right
         case .portraitUpsideDown:
-            return CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: naturalSize.width)
+            return .left
         case .landscapeLeft:
-            return CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: naturalSize.width, ty: naturalSize.height)
+            return .down
         case .landscapeRight:
-            return .identity
+            return .up
         @unknown default:
-            return .identity
+            return .up
         }
-    }
-
-    private func shouldFlipUpsideDown(
-        recordedOrientation: AVCaptureVideoOrientation?,
-        transform: CGAffineTransform
-    ) -> Bool {
-        guard let recordedOrientation,
-              isPortrait(recordedOrientation),
-              let inferred = inferredOrientation(from: transform),
-              isPortrait(inferred) else {
-            return false
-        }
-
-        return recordedOrientation != inferred
     }
 
     private func isPortrait(_ orientation: AVCaptureVideoOrientation) -> Bool {
