@@ -7,7 +7,7 @@ import Combine
 final class CameraScreenViewModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var permissionDeniedMessage: String?
-    @Published var timerDisplayString = "0:00"
+    @Published var timerDisplayString = "0:00.000"
     @Published var prestartCountdownDisplay: Int?
     @Published var pendingExportURL: URL?
     @Published var shouldPresentSaveDialog = false
@@ -18,10 +18,12 @@ final class CameraScreenViewModel: ObservableObject {
 
     private let exporter = VideoBurnInExporter()
     private let corner: TimerOverlayCorner
+    private let shouldBurnInTimer: Bool
     private var cancellables = Set<AnyCancellable>()
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int) {
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool) {
         self.corner = corner
+        self.shouldBurnInTimer = shouldBurnInTimer
         timerManager.configureDuration(countdownDuration)
         timerManager.configurePrestartCountdownSeconds(prestartCountdownSeconds)
         timerDisplayString = timerManager.displayString
@@ -32,10 +34,10 @@ final class CameraScreenViewModel: ObservableObject {
 
                 switch state {
                 case .idle:
-                    self.timerDisplayString = TimerManager.formatTime(0)
+                    self.timerDisplayString = TimerManager.formatTime(0, includeMilliseconds: true)
                     self.prestartCountdownDisplay = nil
                 case .prestartCountdown:
-                    self.timerDisplayString = TimerManager.formatTime(0)
+                    self.timerDisplayString = TimerManager.formatTime(0, includeMilliseconds: true)
                     self.prestartCountdownDisplay = Int(ceil(prestartRemaining))
                 case .running:
                     self.prestartCountdownDisplay = nil
@@ -100,18 +102,24 @@ final class CameraScreenViewModel: ObservableObject {
             }
 
             let rawURL = try await recorder.stopRecording()
-            statusMessage = "Burning timer into video..."
-            let finalURL = try await exporter.exportVideoWithTimer(
-                inputURL: rawURL,
-                timerStartOffset: timerManager.timerStartOffsetFromRecording,
-                timerDuration: timerManager.configuredDuration,
-                recordedOrientation: recorder.lastRecordingOrientation,
-                corner: corner
-            )
-            try? FileManager.default.removeItem(at: rawURL)
-            pendingExportURL = finalURL
+            if shouldBurnInTimer {
+                statusMessage = "Burning timer into video..."
+                let finalURL = try await exporter.exportVideoWithTimer(
+                    inputURL: rawURL,
+                    timerStartOffset: timerManager.timerStartOffsetFromRecording,
+                    timerDuration: timerManager.configuredDuration,
+                    recordedOrientation: recorder.lastRecordingOrientation,
+                    corner: corner
+                )
+                try? FileManager.default.removeItem(at: rawURL)
+                pendingExportURL = finalURL
+                statusMessage = "Recording ready"
+            } else {
+                pendingExportURL = rawURL
+                statusMessage = "Recording ready (no burn-in)"
+            }
+
             shouldPresentSaveDialog = true
-            statusMessage = "Recording ready"
         } catch {
             statusMessage = error.localizedDescription
         }

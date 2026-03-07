@@ -32,11 +32,11 @@ final class TimerManager: ObservableObject {
     var displayString: String {
         switch state {
         case .idle:
-            return Self.formatTime(0)
+            return Self.formatTime(0, includeMilliseconds: true)
         case .prestartCountdown:
-            return Self.formatTime(max(0, prestartRemainingSeconds))
+            return Self.formatTime(max(0, prestartRemainingSeconds), includeMilliseconds: true)
         case .running:
-            return Self.formatTime(elapsedSeconds)
+            return Self.formatTime(elapsedSeconds, includeMilliseconds: true)
         }
     }
 
@@ -64,7 +64,7 @@ final class TimerManager: ObservableObject {
         prestartStartedAt = Date()
         prestartRemainingSeconds = TimeInterval(prestartCountdownSeconds)
 
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshPrestartCountdown(recordingStartedAt: recordingStartedAt)
             }
@@ -102,7 +102,7 @@ final class TimerManager: ObservableObject {
         }
 
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: (1.0 / 30.0), repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshElapsed()
             }
@@ -139,18 +139,27 @@ final class TimerManager: ObservableObject {
         }
     }
 
-    nonisolated static func formatTime(_ seconds: TimeInterval) -> String {
-        let value = Int(seconds)
-        let minutes = value / 60
-        let secs = value % 60
+    nonisolated static func formatTime(_ seconds: TimeInterval, includeMilliseconds: Bool = true) -> String {
+        let clampedSeconds = max(0, seconds)
+        let minutes = Int(clampedSeconds) / 60
+        let secs = Int(clampedSeconds) % 60
+
+        if includeMilliseconds {
+            let millis = Int((clampedSeconds * 1000).truncatingRemainder(dividingBy: 1000))
+            return String(format: "%d:%02d.%03d", minutes, secs, millis)
+        }
+
         return String(format: "%d:%02d", minutes, secs)
     }
 
     nonisolated static func formatCountUp(elapsed: TimeInterval, duration: TimeInterval) -> String {
+        let value: TimeInterval
         if duration > 0 {
-            return formatTime(min(max(0, elapsed), duration))
+            value = min(max(0, elapsed), duration)
+        } else {
+            value = max(0, elapsed)
         }
 
-        return formatTime(max(0, elapsed))
+        return formatTime(value, includeMilliseconds: true)
     }
 }

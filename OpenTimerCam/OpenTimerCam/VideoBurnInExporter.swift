@@ -56,7 +56,9 @@ struct VideoBurnInExporter {
             request.finish(with: result, context: nil)
         }
 
-        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        let nominalFPS = try await sourceVideoTrack.load(.nominalFrameRate)
+        let targetFPS = max(30, Int32(nominalFPS.rounded()))
+        videoComposition.frameDuration = CMTime(value: 1, timescale: targetFPS)
         videoComposition.renderSize = renderSize
 
         guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
@@ -180,11 +182,11 @@ final class TimerOverlayRenderer {
         }
 
         static func `for`(canvasSize: CGSize) -> BadgeStyle {
-            let width = max(110, min(230, Int(canvasSize.width * 0.19)))
-            let height = max(46, min(86, Int(Double(width) * 0.44)))
-            let cornerRadius = max(10, Int(Double(height) * 0.24))
-            let fontSize = max(24, Int(Double(height) * 0.56))
-            let textYOffset = max(5, Int(Double(height) * 0.18))
+            let width = max(170, min(300, Int(canvasSize.width * 0.27)))
+            let height = max(60, min(100, Int(Double(width) * 0.37)))
+            let cornerRadius = max(12, Int(Double(height) * 0.24))
+            let fontSize = max(28, Int(Double(height) * 0.54))
+            let textYOffset = max(6, Int(Double(height) * 0.16))
 
             return BadgeStyle(
                 width: width,

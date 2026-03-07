@@ -7,12 +7,13 @@ struct CameraScreenView: View {
     @State private var shouldConfirmLeaving = false
     @State private var isNavigatingBack = false
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, onBackToSetup: @escaping () -> Void) {
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool, onBackToSetup: @escaping () -> Void) {
         _viewModel = StateObject(
             wrappedValue: CameraScreenViewModel(
                 corner: corner,
                 countdownDuration: countdownDuration,
-                prestartCountdownSeconds: prestartCountdownSeconds
+                prestartCountdownSeconds: prestartCountdownSeconds,
+                shouldBurnInTimer: shouldBurnInTimer
             )
         )
         self.onBackToSetup = onBackToSetup
@@ -72,12 +73,12 @@ struct CameraScreenView: View {
 
     private var timerOverlay: some View {
         Text(viewModel.timerDisplayString)
-            .font(.system(size: 22, weight: .semibold, design: .monospaced))
+            .font(.system(size: 26, weight: .bold, design: .monospaced))
             .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.black.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.black.opacity(0.68))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var topBackButton: some View {

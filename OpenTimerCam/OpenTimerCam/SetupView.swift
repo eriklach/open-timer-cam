@@ -4,6 +4,7 @@ struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
     @Binding var timerMinutes: Int
     @Binding var countdownSeconds: Int
+    @Binding var burnInTimer: Bool
     let onContinue: () -> Void
 
     private let countdownOptions = [0, 3, 5, 10]
@@ -29,7 +30,9 @@ struct SetupView: View {
                     }
                 }
 
-                Text("Timer format: m:ss count up")
+                Toggle("Burn timer into exported video", isOn: $burnInTimer)
+
+                Text("Timer format: m:ss.SSS count up")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
