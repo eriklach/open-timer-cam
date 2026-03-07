@@ -39,9 +39,21 @@ struct CameraScreenView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 22)
             }
+            .allowsHitTesting(!isShowingCustomDialog)
 
             if let countdown = viewModel.prestartCountdownDisplay {
                 prestartCountdownOverlay(countdown)
+            }
+
+            if isShowingCustomDialog {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+
+                if shouldConfirmLeaving {
+                    leaveDialog
+                } else if viewModel.shouldPresentSaveDialog {
+                    saveDialog
+                }
             }
         }
         .task {
@@ -51,29 +63,6 @@ struct CameraScreenView: View {
             Button("OK") { viewModel.permissionDeniedMessage = nil }
         } message: {
             Text(viewModel.permissionDeniedMessage ?? "")
-        }
-        .alert("Leave timer setup?", isPresented: $shouldConfirmLeaving) {
-            Button("Stay", role: .cancel) { }
-            Button("Leave", role: .destructive) {
-                Task { await leaveFlow() }
-            }
-        } message: {
-            Text(viewModel.recorder.isRecording ? "You are currently recording. Leaving now will stop and discard this recording." : "Are you sure you want to leave this page?")
-        }
-        .confirmationDialog(
-            "Save recording?",
-            isPresented: $viewModel.shouldPresentSaveDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Save") {
-                Task { await viewModel.savePendingRecording() }
-            }
-
-            Button("Discard", role: .destructive) {
-                viewModel.discardPendingRecording()
-            }
-
-            Button("Cancel", role: .cancel) { }
         }
     }
 
@@ -90,24 +79,26 @@ struct CameraScreenView: View {
     private var timerPanel: some View {
         VStack(spacing: 0) {
             Text(viewModel.timerDisplayString)
-                .font(.system(size: 44, weight: .bold, design: .monospaced))
+                .font(.system(size: 40, weight: .bold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(neonGreen)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 11)
                 .padding(.horizontal, 12)
                 .overlay {
                     Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
                 }
 
             Button(timerActionLabel) {
-                viewModel.startTimer()
+                viewModel.toggleTimer()
             }
-            .font(.system(size: 34, weight: .bold, design: .monospaced))
-            .foregroundStyle(timerActionIsEnabled ? Color.black : neonGreen.opacity(0.5))
+            .font(.system(size: 26, weight: .bold, design: .monospaced))
+            .foregroundStyle(timerActionForeground)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(timerActionIsEnabled ? neonGreen : Color.black.opacity(0.78))
+            .padding(.vertical, 10)
+            .background(timerActionBackground)
             .overlay {
                 Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
             }
@@ -123,7 +114,7 @@ struct CameraScreenView: View {
             shouldConfirmLeaving = true
         } label: {
             Image(systemName: "chevron.left")
-                .font(.system(size: 28, weight: .heavy, design: .monospaced))
+                .font(.system(size: 26, weight: .heavy, design: .monospaced))
                 .foregroundStyle(neonGreen)
                 .frame(width: 64, height: 64)
                 .background(Color.black.opacity(0.55))
@@ -137,10 +128,10 @@ struct CameraScreenView: View {
     }
 
     private var bottomRecordBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             if !viewModel.statusMessage.isEmpty {
                 Text(viewModel.statusMessage.uppercased())
-                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+                    .font(.system(size: 15, weight: .medium, design: .monospaced))
                     .foregroundStyle(neonGreen.opacity(0.9))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .lineLimit(2)
@@ -152,13 +143,13 @@ struct CameraScreenView: View {
                 HStack {
                     Spacer()
                     Text(recordingToggleLabel.uppercased())
-                        .font(.system(size: 38, weight: .bold, design: .monospaced))
-                        .tracking(0.5)
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .tracking(0.4)
                     Image(systemName: viewModel.recorder.isRecording ? "stop.fill" : "record.circle.fill")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                     Spacer()
                 }
-                .padding(.vertical, 18)
+                .padding(.vertical, 12)
                 .foregroundStyle(recordButtonForeground)
                 .background(recordButtonBackground)
                 .overlay {
@@ -168,7 +159,7 @@ struct CameraScreenView: View {
             .disabled(!canToggleRecording)
             .neonGlow(color: neonGreen)
         }
-        .padding(12)
+        .padding(10)
         .background(Color.black.opacity(0.6))
         .overlay {
             Rectangle().stroke(neonGreen.opacity(0.8), lineWidth: 1.2)
@@ -183,6 +174,82 @@ struct CameraScreenView: View {
             .padding(.vertical, 170)
             .allowsHitTesting(false)
             .neonGlow(color: neonGreen, radius: 2.4)
+    }
+
+    private var leaveDialog: some View {
+        VStack(spacing: 14) {
+            Text("LEAVE SETUP?")
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundStyle(neonGreen)
+
+            Text(viewModel.recorder.isRecording ? "LEAVING NOW WILL STOP AND DISCARD THIS RECORDING." : "ARE YOU SURE YOU WANT TO LEAVE THIS PAGE?")
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundStyle(neonGreen.opacity(0.9))
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 10) {
+                dialogButton(title: "STAY", isFilled: false) {
+                    shouldConfirmLeaving = false
+                }
+
+                dialogButton(title: "LEAVE", isFilled: true) {
+                    shouldConfirmLeaving = false
+                    Task { await leaveFlow() }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 340)
+        .background(Color.black.opacity(0.9))
+        .overlay {
+            Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.4)
+        }
+        .neonGlow(color: neonGreen)
+    }
+
+    private var saveDialog: some View {
+        VStack(spacing: 14) {
+            Text("SAVE RECORDING?")
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundStyle(neonGreen)
+
+            HStack(spacing: 10) {
+                dialogButton(title: "SAVE", isFilled: true) {
+                    Task { await viewModel.savePendingRecording() }
+                }
+
+                dialogButton(title: "DISCARD", isFilled: false) {
+                    viewModel.discardPendingRecording()
+                }
+            }
+
+            dialogButton(title: "CANCEL", isFilled: false) {
+                viewModel.shouldPresentSaveDialog = false
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 340)
+        .background(Color.black.opacity(0.9))
+        .overlay {
+            Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.4)
+        }
+        .neonGlow(color: neonGreen)
+    }
+
+    private func dialogButton(title: String, isFilled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .foregroundStyle(isFilled ? Color.black : neonGreen)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(isFilled ? neonGreen : Color.black.opacity(0.82))
+                .overlay {
+                    Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.3)
+                }
+        }
     }
 
     private func prestartCountdownOverlay(_ countdown: Int) -> some View {
@@ -206,20 +273,36 @@ struct CameraScreenView: View {
         .allowsHitTesting(false)
     }
 
+    private var isShowingCustomDialog: Bool {
+        shouldConfirmLeaving || viewModel.shouldPresentSaveDialog
+    }
+
     private var canToggleRecording: Bool {
         (viewModel.recorder.isRecording || viewModel.pendingExportURL == nil) && !viewModel.isStoppingRecording && !isNavigatingBack
     }
 
     private var timerActionIsEnabled: Bool {
-        viewModel.recorder.isRecording && !viewModel.timerManager.isRunning && !viewModel.timerManager.isInPrestartCountdown
+        if viewModel.timerManager.isRunning || viewModel.timerManager.isInPrestartCountdown {
+            return true
+        }
+
+        return viewModel.recorder.isRecording && !viewModel.isStoppingRecording
     }
 
     private var timerActionLabel: String {
         if viewModel.timerManager.isRunning || viewModel.timerManager.isInPrestartCountdown {
-            return "TIMER RUNNING"
+            return "STOP TIMER"
         }
 
         return "START TIMER"
+    }
+
+    private var timerActionForeground: Color {
+        timerActionIsEnabled ? .black : neonGreen.opacity(0.5)
+    }
+
+    private var timerActionBackground: Color {
+        timerActionIsEnabled ? neonGreen : Color.black.opacity(0.78)
     }
 
     private var recordingToggleLabel: String {
@@ -227,7 +310,9 @@ struct CameraScreenView: View {
     }
 
     private var recordButtonForeground: Color {
-        canToggleRecording ? .black : neonGreen.opacity(0.45)
+        guard canToggleRecording else { return neonGreen.opacity(0.45) }
+
+        return viewModel.recorder.isRecording ? neonGreen : .black
     }
 
     private var recordButtonBackground: Color {
