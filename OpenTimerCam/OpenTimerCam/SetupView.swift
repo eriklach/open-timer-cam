@@ -3,7 +3,10 @@ import SwiftUI
 struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
     @Binding var timerMinutes: Int
+    @Binding var countdownSeconds: Int
     let onContinue: () -> Void
+
+    private let countdownOptions = [0, 3, 5, 10]
 
     var body: some View {
         Form {
@@ -11,6 +14,12 @@ struct SetupView: View {
                 Picker("Minutes", selection: $timerMinutes) {
                     ForEach(0...59, id: \.self) { minute in
                         Text("\(minute) min").tag(minute)
+                    }
+                }
+
+                Picker("Starting Countdown", selection: $countdownSeconds) {
+                    ForEach(countdownOptions, id: \.self) { seconds in
+                        Text(seconds == 0 ? "Off" : "\(seconds) sec").tag(seconds)
                     }
                 }
 

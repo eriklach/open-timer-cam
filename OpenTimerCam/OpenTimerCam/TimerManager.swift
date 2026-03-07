@@ -11,7 +11,8 @@ final class TimerManager: ObservableObject {
 
     @Published private(set) var elapsedSeconds: TimeInterval = 0
     @Published private(set) var configuredDuration: TimeInterval = 0
-    @Published private(set) var prestartRemainingSeconds: TimeInterval = 10
+    @Published private(set) var prestartRemainingSeconds: TimeInterval = 0
+    @Published private(set) var prestartCountdownSeconds: Int = 10
     @Published private(set) var state: State = .idle
 
     private var timer: Timer?
@@ -44,11 +45,24 @@ final class TimerManager: ObservableObject {
         reset()
     }
 
+    func configurePrestartCountdownSeconds(_ seconds: Int) {
+        prestartCountdownSeconds = max(0, seconds)
+        if state == .idle {
+            prestartRemainingSeconds = TimeInterval(prestartCountdownSeconds)
+        }
+    }
+
     func startPrestartCountdown(recordingStartedAt: Date?) {
         guard state == .idle else { return }
+
+        if prestartCountdownSeconds == 0 {
+            beginRunningTimer(recordingStartedAt: recordingStartedAt)
+            return
+        }
+
         state = .prestartCountdown
         prestartStartedAt = Date()
-        prestartRemainingSeconds = 10
+        prestartRemainingSeconds = TimeInterval(prestartCountdownSeconds)
 
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -71,7 +85,7 @@ final class TimerManager: ObservableObject {
         timer = nil
         state = .idle
         elapsedSeconds = 0
-        prestartRemainingSeconds = 10
+        prestartRemainingSeconds = TimeInterval(prestartCountdownSeconds)
         startedAt = nil
         prestartStartedAt = nil
         timerStartOffsetFromRecording = nil
@@ -97,14 +111,14 @@ final class TimerManager: ObservableObject {
 
     private func refreshPrestartCountdown(recordingStartedAt: Date?) {
         guard let prestartStartedAt else {
-            prestartRemainingSeconds = 10
+            prestartRemainingSeconds = TimeInterval(prestartCountdownSeconds)
             return
         }
 
         let elapsed = max(0, Date().timeIntervalSince(prestartStartedAt))
-        prestartRemainingSeconds = max(0, 10 - elapsed)
+        prestartRemainingSeconds = max(0, TimeInterval(prestartCountdownSeconds) - elapsed)
 
-        if elapsed >= 10 {
+        if elapsed >= TimeInterval(prestartCountdownSeconds) {
             beginRunningTimer(recordingStartedAt: recordingStartedAt)
         }
     }

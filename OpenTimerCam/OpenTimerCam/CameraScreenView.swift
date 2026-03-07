@@ -6,9 +6,13 @@ struct CameraScreenView: View {
 
     @State private var shouldConfirmLeaving = false
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, onBackToSetup: @escaping () -> Void) {
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, onBackToSetup: @escaping () -> Void) {
         _viewModel = StateObject(
-            wrappedValue: CameraScreenViewModel(corner: corner, countdownDuration: countdownDuration)
+            wrappedValue: CameraScreenViewModel(
+                corner: corner,
+                countdownDuration: countdownDuration,
+                prestartCountdownSeconds: prestartCountdownSeconds
+            )
         )
         self.onBackToSetup = onBackToSetup
     }
@@ -20,6 +24,10 @@ struct CameraScreenView: View {
 
             timerOverlay
                 .padding(16)
+
+            if let countdown = viewModel.prestartCountdownDisplay {
+                prestartCountdownOverlay(countdown)
+            }
 
             controls
         }
@@ -72,6 +80,24 @@ struct CameraScreenView: View {
             .padding(.vertical, 6)
             .background(.black.opacity(0.65))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func prestartCountdownOverlay(_ countdown: Int) -> some View {
+        VStack {
+            Spacer()
+
+            Text("\(countdown)")
+                .font(.system(size: 92, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 36)
+                .padding(.vertical, 20)
+                .background(.black.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
     }
 
     private var controls: some View {
