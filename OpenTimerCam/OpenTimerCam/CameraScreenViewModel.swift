@@ -11,7 +11,7 @@ final class CameraScreenViewModel: ObservableObject {
     @Published var prestartCountdownDisplay: Int?
     @Published var pendingExportURL: URL?
     @Published var shouldPresentSaveDialog = false
-    @Published var shouldConfirmStopRecording = false
+    @Published var isStoppingRecording = false
 
     let recorder = CameraRecorder()
     let timerManager = TimerManager()
@@ -65,6 +65,7 @@ final class CameraScreenViewModel: ObservableObject {
     }
 
     func startRecording() {
+        guard !isStoppingRecording else { return }
         timerManager.reset()
         timerDisplayString = timerManager.displayString
         prestartCountdownDisplay = nil
@@ -72,18 +73,26 @@ final class CameraScreenViewModel: ObservableObject {
         statusMessage = "Recording..."
     }
 
+    func toggleRecording() {
+        if recorder.isRecording {
+            Task { await stopRecording() }
+        } else {
+            startRecording()
+        }
+    }
+
     func startTimer() {
         timerManager.startPrestartCountdown(recordingStartedAt: recorder.recordingStartedAt)
         statusMessage = ""
     }
 
-    func requestStopRecordingConfirmation() {
-        guard recorder.isRecording, pendingExportURL == nil else { return }
-        shouldConfirmStopRecording = true
-    }
-
     func stopRecording() async {
-        shouldConfirmStopRecording = false
+        guard recorder.isRecording, pendingExportURL == nil, !isStoppingRecording else { return }
+        isStoppingRecording = true
+
+        defer {
+            isStoppingRecording = false
+        }
 
         do {
             if timerManager.isInPrestartCountdown || timerManager.isRunning {
@@ -103,6 +112,27 @@ final class CameraScreenViewModel: ObservableObject {
             pendingExportURL = finalURL
             shouldPresentSaveDialog = true
             statusMessage = "Recording ready"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func abandonActiveRecordingAndSession() async {
+        guard recorder.isRecording, !isStoppingRecording else { return }
+        isStoppingRecording = true
+
+        defer {
+            isStoppingRecording = false
+        }
+
+        if timerManager.isInPrestartCountdown || timerManager.isRunning {
+            timerManager.stopTimer()
+        }
+
+        do {
+            let rawURL = try await recorder.stopRecording()
+            try? FileManager.default.removeItem(at: rawURL)
+            statusMessage = "Recording discarded"
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -128,6 +158,24 @@ final class CameraScreenViewModel: ObservableObject {
         self.pendingExportURL = nil
         shouldPresentSaveDialog = false
         statusMessage = "Recording discarded"
+    }
+
+    func cleanupOnNavigation() async {
+        while isStoppingRecording {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        if recorder.isRecording {
+            await abandonActiveRecordingAndSession()
+        }
+
+        if let pendingExportURL {
+            try? FileManager.default.removeItem(at: pendingExportURL)
+            self.pendingExportURL = nil
+            shouldPresentSaveDialog = false
+        }
+
+        recorder.stopSession()
     }
 
     private func requestPermissions() async -> Bool {

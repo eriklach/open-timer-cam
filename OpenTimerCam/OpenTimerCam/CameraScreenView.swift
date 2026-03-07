@@ -5,6 +5,7 @@ struct CameraScreenView: View {
     let onBackToSetup: () -> Void
 
     @State private var shouldConfirmLeaving = false
+    @State private var isNavigatingBack = false
 
     init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, onBackToSetup: @escaping () -> Void) {
         _viewModel = StateObject(
@@ -31,6 +32,11 @@ struct CameraScreenView: View {
 
             controls
         }
+        .overlay(alignment: .topLeading) {
+            topBackButton
+                .padding(.top, 16)
+                .padding(.leading, 16)
+        }
         .task {
             await viewModel.setup()
         }
@@ -42,18 +48,10 @@ struct CameraScreenView: View {
         .alert("Leave timer setup?", isPresented: $shouldConfirmLeaving) {
             Button("Stay", role: .cancel) { }
             Button("Leave", role: .destructive) {
-                onBackToSetup()
+                Task { await leaveFlow() }
             }
         } message: {
-            Text("Are you sure you want to leave this page?")
-        }
-        .alert("End recording?", isPresented: $viewModel.shouldConfirmStopRecording) {
-            Button("Cancel", role: .cancel) { }
-            Button("Stop Recording", role: .destructive) {
-                Task { await viewModel.stopRecording() }
-            }
-        } message: {
-            Text("Are you sure you want to end the recording?")
+            Text(viewModel.recorder.isRecording ? "You are currently recording. Leaving now will stop and discard this recording." : "Are you sure you want to leave this page?")
         }
         .confirmationDialog(
             "Save recording?",
@@ -80,6 +78,21 @@ struct CameraScreenView: View {
             .padding(.vertical, 6)
             .background(.black.opacity(0.65))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var topBackButton: some View {
+        Button {
+            shouldConfirmLeaving = true
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(.black.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .disabled(isNavigatingBack)
+        .accessibilityLabel("Back")
     }
 
     private func prestartCountdownOverlay(_ countdown: Int) -> some View {
@@ -114,49 +127,58 @@ struct CameraScreenView: View {
             }
 
             HStack(spacing: 12) {
-                Button("Back") {
-                    shouldConfirmLeaving = true
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.recorder.isRecording)
-
-                Button("Start Recording") {
-                    viewModel.startRecording()
+                Button {
+                    viewModel.toggleRecording()
+                } label: {
+                    Label(recordingToggleLabel, systemImage: recordingToggleIcon)
+                        .frame(minWidth: 138)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(canStartRecording ? .red : .gray)
-                .disabled(!canStartRecording)
+                .tint(recordingToggleTint)
+                .controlSize(.large)
+                .disabled(!canToggleRecording)
 
                 Button("Start Timer") {
                     viewModel.startTimer()
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .tint(canStartTimer ? .orange : .gray)
                 .disabled(!canStartTimer)
-
-                Button("Stop Recording") {
-                    viewModel.requestStopRecordingConfirmation()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(canStopRecording ? .red : .gray)
-                .disabled(!canStopRecording)
             }
+            .buttonBorderShape(.roundedRectangle)
             .padding()
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding()
         }
     }
 
-    private var canStartRecording: Bool {
-        !viewModel.recorder.isRecording && viewModel.pendingExportURL == nil
+    private var canToggleRecording: Bool {
+        (viewModel.recorder.isRecording || viewModel.pendingExportURL == nil) && !viewModel.isStoppingRecording && !isNavigatingBack
     }
 
     private var canStartTimer: Bool {
         viewModel.recorder.isRecording && !viewModel.timerManager.isRunning && !viewModel.timerManager.isInPrestartCountdown
     }
 
-    private var canStopRecording: Bool {
-        viewModel.recorder.isRecording && viewModel.pendingExportURL == nil
+    private var recordingToggleLabel: String {
+        viewModel.recorder.isRecording ? "Stop Recording" : "Start Recording"
+    }
+
+    private var recordingToggleIcon: String {
+        viewModel.recorder.isRecording ? "stop.fill" : "record.circle.fill"
+    }
+
+    private var recordingToggleTint: Color {
+        canToggleRecording ? .red : .gray
+    }
+
+    private func leaveFlow() async {
+        guard !isNavigatingBack else { return }
+        isNavigatingBack = true
+
+        await viewModel.cleanupOnNavigation()
+        onBackToSetup()
     }
 }
