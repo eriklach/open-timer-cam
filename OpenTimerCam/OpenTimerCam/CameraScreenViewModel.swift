@@ -8,6 +8,7 @@ final class CameraScreenViewModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var permissionDeniedMessage: String?
     @Published var timerDisplayString = "0:00"
+    @Published var prestartCountdownDisplay: Int?
     @Published var pendingExportURL: URL?
     @Published var shouldPresentSaveDialog = false
     @Published var shouldConfirmStopRecording = false
@@ -19,9 +20,10 @@ final class CameraScreenViewModel: ObservableObject {
     private let corner: TimerOverlayCorner
     private var cancellables = Set<AnyCancellable>()
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval) {
+    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int) {
         self.corner = corner
         timerManager.configureDuration(countdownDuration)
+        timerManager.configurePrestartCountdownSeconds(prestartCountdownSeconds)
         timerDisplayString = timerManager.displayString
 
         Publishers.CombineLatest3(timerManager.$elapsedSeconds, timerManager.$prestartRemainingSeconds, timerManager.$state)
@@ -31,9 +33,12 @@ final class CameraScreenViewModel: ObservableObject {
                 switch state {
                 case .idle:
                     self.timerDisplayString = TimerManager.formatTime(0)
+                    self.prestartCountdownDisplay = nil
                 case .prestartCountdown:
-                    self.timerDisplayString = TimerManager.formatTime(prestartRemaining)
+                    self.timerDisplayString = TimerManager.formatTime(0)
+                    self.prestartCountdownDisplay = Int(ceil(prestartRemaining))
                 case .running:
+                    self.prestartCountdownDisplay = nil
                     self.timerDisplayString = TimerManager.formatCountUp(
                         elapsed: elapsed,
                         duration: self.timerManager.configuredDuration
@@ -62,13 +67,14 @@ final class CameraScreenViewModel: ObservableObject {
     func startRecording() {
         timerManager.reset()
         timerDisplayString = timerManager.displayString
+        prestartCountdownDisplay = nil
         recorder.startRecording()
         statusMessage = "Recording..."
     }
 
     func startTimer() {
         timerManager.startPrestartCountdown(recordingStartedAt: recorder.recordingStartedAt)
-        statusMessage = "Starting in 10 seconds..."
+        statusMessage = ""
     }
 
     func requestStopRecordingConfirmation() {
