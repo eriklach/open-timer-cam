@@ -49,7 +49,7 @@ struct VideoBurnInExporter {
                 .transformed(by: .init(translationX: -rotatedImage.extent.minX, y: -rotatedImage.extent.minY))
                 .cropped(to: videoBounds)
             let elapsed = max(0, CMTimeGetSeconds(request.compositionTime) - safeTimerOffset)
-            let text = TimerManager.formatCountdown(elapsed: elapsed, duration: timerDuration)
+            let text = TimerManager.formatCountUp(elapsed: elapsed, duration: timerDuration)
 
             let badge = renderer.makeOverlayImage(text: text, canvasSize: renderSize)
             let result = badge.composited(over: sourceImage).cropped(to: videoBounds)
