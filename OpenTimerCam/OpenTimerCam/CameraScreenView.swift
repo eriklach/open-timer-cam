@@ -31,13 +31,13 @@ struct CameraScreenView: View {
             VStack(spacing: 0) {
                 topHUD
                     .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.top, 12)
 
                 Spacer()
 
                 bottomRecordBar
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 22)
+                    .padding(.bottom, 16)
             }
             .allowsHitTesting(!isShowingCustomDialog)
 
@@ -79,11 +79,11 @@ struct CameraScreenView: View {
     private var timerPanel: some View {
         VStack(spacing: 0) {
             Text(viewModel.timerDisplayString)
-                .font(.system(size: 40, weight: .bold, design: .monospaced))
+                .font(.system(size: 36, weight: .bold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(neonGreen)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
+                .padding(.vertical, 9)
                 .padding(.horizontal, 12)
                 .overlay {
                     Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
@@ -92,12 +92,12 @@ struct CameraScreenView: View {
             Button(timerActionLabel) {
                 viewModel.toggleTimer()
             }
-            .font(.system(size: 26, weight: .bold, design: .monospaced))
+            .font(.system(size: 23, weight: .bold, design: .monospaced))
             .foregroundStyle(timerActionForeground)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(timerActionBackground)
             .overlay {
                 Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
@@ -114,9 +114,9 @@ struct CameraScreenView: View {
             shouldConfirmLeaving = true
         } label: {
             Image(systemName: "chevron.left")
-                .font(.system(size: 26, weight: .heavy, design: .monospaced))
+                .font(.system(size: 22, weight: .heavy, design: .monospaced))
                 .foregroundStyle(neonGreen)
-                .frame(width: 64, height: 64)
+                .frame(width: 56, height: 56)
                 .background(Color.black.opacity(0.55))
                 .overlay {
                     Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
@@ -131,7 +131,7 @@ struct CameraScreenView: View {
         VStack(spacing: 6) {
             if !viewModel.statusMessage.isEmpty {
                 Text(viewModel.statusMessage.uppercased())
-                    .font(.system(size: 15, weight: .medium, design: .monospaced))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(neonGreen.opacity(0.9))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .lineLimit(2)
@@ -143,13 +143,13 @@ struct CameraScreenView: View {
                 HStack {
                     Spacer()
                     Text(recordingToggleLabel.uppercased())
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
                         .tracking(0.4)
                     Image(systemName: viewModel.recorder.isRecording ? "stop.fill" : "record.circle.fill")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 19, weight: .bold))
                     Spacer()
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .foregroundStyle(recordButtonForeground)
                 .background(recordButtonBackground)
                 .overlay {
@@ -159,7 +159,7 @@ struct CameraScreenView: View {
             .disabled(!canToggleRecording)
             .neonGlow(color: neonGreen)
         }
-        .padding(10)
+        .padding(8)
         .background(Color.black.opacity(0.6))
         .overlay {
             Rectangle().stroke(neonGreen.opacity(0.8), lineWidth: 1.2)
@@ -171,7 +171,7 @@ struct CameraScreenView: View {
         RoundedRectangle(cornerRadius: 0)
             .stroke(neonGreen.opacity(0.75), lineWidth: 1.5)
             .padding(.horizontal, 16)
-            .padding(.vertical, 170)
+            .padding(.vertical, 150)
             .allowsHitTesting(false)
             .neonGlow(color: neonGreen, radius: 2.4)
     }
