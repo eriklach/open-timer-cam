@@ -88,6 +88,16 @@ final class CameraScreenViewModel: ObservableObject {
         statusMessage = ""
     }
 
+    func toggleTimer() {
+        if timerManager.isRunning || timerManager.isInPrestartCountdown {
+            timerManager.stopTimer()
+            statusMessage = "Timer stopped"
+            return
+        }
+
+        startTimer()
+    }
+
     func stopRecording() async {
         guard recorder.isRecording, pendingExportURL == nil, !isStoppingRecording else { return }
         isStoppingRecording = true
