@@ -36,7 +36,7 @@ final class CameraRecorder: NSObject, ObservableObject {
     private(set) var recordingStartedAt: Date?
     private(set) var lastRecordingOrientation: AVCaptureVideoOrientation?
 
-    func configureSession() async throws {
+    func configureSession(cameraPosition: AVCaptureDevice.Position) async throws {
         try await withCheckedThrowingContinuation { cont in
             sessionQueue.async {
                 do {
@@ -44,7 +44,7 @@ final class CameraRecorder: NSObject, ObservableObject {
                     self.session.sessionPreset = .high
 
                     guard
-                        let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                        let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition)
                     else {
                         throw RecorderError.cameraUnavailable
                     }

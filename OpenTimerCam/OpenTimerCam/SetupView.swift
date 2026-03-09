@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
+    @Binding var selectedCameraPosition: CameraPositionOption
     @Binding var timerMinutes: Int
     @Binding var countdownSeconds: Int
     let onContinue: () -> Void
@@ -43,6 +44,10 @@ struct SetupView: View {
 
                     neonCard(title: "TIMER POSITION") {
                         segmentedCorner
+                    }
+
+                    neonCard(title: "CAMERA") {
+                        segmentedCamera
                     }
 
                     Text("FORMAT: M:SS.SSS COUNT UP")
@@ -115,6 +120,29 @@ struct SetupView: View {
                 } label: {
                     Text(cornerShortLabel(corner))
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundStyle(isSelected ? Color.black : neonGreen)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(isSelected ? neonGreen : Color.black.opacity(0.85))
+                        .overlay {
+                            Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.2)
+                        }
+                }
+            }
+        }
+    }
+
+    private var segmentedCamera: some View {
+        HStack(spacing: 8) {
+            ForEach(CameraPositionOption.allCases) { position in
+                let isSelected = position == selectedCameraPosition
+                Button {
+                    selectedCameraPosition = position
+                } label: {
+                    Text(position.shortLabel)
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundStyle(isSelected ? Color.black : neonGreen)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)

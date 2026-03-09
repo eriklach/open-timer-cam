@@ -18,11 +18,13 @@ final class CameraScreenViewModel: ObservableObject {
 
     private let exporter = VideoBurnInExporter()
     private let corner: TimerOverlayCorner
+    private let cameraPosition: CameraPositionOption
     private let shouldBurnInTimer: Bool
     private var cancellables = Set<AnyCancellable>()
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool) {
+    init(corner: TimerOverlayCorner, cameraPosition: CameraPositionOption, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool) {
         self.corner = corner
+        self.cameraPosition = cameraPosition
         self.shouldBurnInTimer = shouldBurnInTimer
         timerManager.configureDuration(countdownDuration)
         timerManager.configurePrestartCountdownSeconds(prestartCountdownSeconds)
@@ -58,7 +60,7 @@ final class CameraScreenViewModel: ObservableObject {
                 return
             }
 
-            try await recorder.configureSession()
+            try await recorder.configureSession(cameraPosition: cameraPosition.captureDevicePosition)
             recorder.startSession()
             statusMessage = "Ready"
         } catch {
