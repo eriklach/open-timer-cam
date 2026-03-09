@@ -5,7 +5,6 @@ struct ContentView: View {
     @AppStorage("setup.selectedCorner") private var selectedCornerRawValue = TimerOverlayCorner.topTrailing.rawValue
     @AppStorage("setup.timerMinutes") private var timerMinutes = 0
     @AppStorage("setup.countdownSeconds") private var countdownSeconds = 10
-    @AppStorage("setup.burnInTimer") private var burnInTimer = true
 
     private var selectedCornerBinding: Binding<TimerOverlayCorner> {
         Binding(
@@ -21,15 +20,14 @@ struct ContentView: View {
                     corner: selectedCornerBinding.wrappedValue,
                     countdownDuration: TimeInterval(timerMinutes * 60),
                     prestartCountdownSeconds: countdownSeconds,
-                    shouldBurnInTimer: burnInTimer,
+                    shouldBurnInTimer: true,
                     onBackToSetup: { didContinue = false }
                 )
             } else {
                 SetupView(
                     selectedCorner: selectedCornerBinding,
                     timerMinutes: $timerMinutes,
-                    countdownSeconds: $countdownSeconds,
-                    burnInTimer: $burnInTimer
+                    countdownSeconds: $countdownSeconds
                 ) {
                     didContinue = true
                 }

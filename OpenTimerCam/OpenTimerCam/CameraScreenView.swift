@@ -89,20 +89,22 @@ struct CameraScreenView: View {
                     Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
                 }
 
-            Button(timerActionLabel) {
-                viewModel.toggleTimer()
+            if !viewModel.timerManager.isRunning && !viewModel.timerManager.isInPrestartCountdown {
+                Button("START TIMER") {
+                    viewModel.toggleTimer()
+                }
+                .font(.system(size: 23, weight: .bold, design: .monospaced))
+                .foregroundStyle(timerActionForeground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(timerActionBackground)
+                .overlay {
+                    Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
+                }
+                .disabled(!timerActionIsEnabled)
             }
-            .font(.system(size: 23, weight: .bold, design: .monospaced))
-            .foregroundStyle(timerActionForeground)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(timerActionBackground)
-            .overlay {
-                Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
-            }
-            .disabled(!timerActionIsEnabled)
         }
         .background(Color.black.opacity(0.52))
         .neonGlow(color: neonGreen)
@@ -222,10 +224,6 @@ struct CameraScreenView: View {
                     viewModel.discardPendingRecording()
                 }
             }
-
-            dialogButton(title: "CANCEL", isFilled: false) {
-                viewModel.shouldPresentSaveDialog = false
-            }
         }
         .padding(16)
         .frame(maxWidth: 340)
@@ -256,21 +254,34 @@ struct CameraScreenView: View {
         VStack {
             Spacer()
 
-            Text("\(countdown)")
-                .font(.system(size: 92, weight: .heavy, design: .monospaced))
-                .foregroundStyle(neonGreen)
-                .padding(.horizontal, 42)
-                .padding(.vertical, 20)
-                .background(Color.black.opacity(0.78))
-                .overlay {
-                    Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
+            VStack(spacing: 12) {
+                Text("\(countdown)")
+                    .font(.system(size: 92, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(neonGreen)
+
+                Button("CANCEL") {
+                    viewModel.cancelPrestartCountdown()
                 }
-                .neonGlow(color: neonGreen, radius: 4)
+                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 6)
+                .background(neonGreen)
+                .overlay {
+                    Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.2)
+                }
+            }
+            .padding(.horizontal, 42)
+            .padding(.vertical, 20)
+            .background(Color.black.opacity(0.78))
+            .overlay {
+                Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.5)
+            }
+            .neonGlow(color: neonGreen, radius: 4)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(false)
     }
 
     private var isShowingCustomDialog: Bool {
@@ -287,14 +298,6 @@ struct CameraScreenView: View {
         }
 
         return viewModel.recorder.isRecording && !viewModel.isStoppingRecording
-    }
-
-    private var timerActionLabel: String {
-        if viewModel.timerManager.isRunning || viewModel.timerManager.isInPrestartCountdown {
-            return "STOP TIMER"
-        }
-
-        return "START TIMER"
     }
 
     private var timerActionForeground: Color {
