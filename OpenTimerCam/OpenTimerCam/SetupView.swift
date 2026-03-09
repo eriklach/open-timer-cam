@@ -4,7 +4,6 @@ struct SetupView: View {
     @Binding var selectedCorner: TimerOverlayCorner
     @Binding var timerMinutes: Int
     @Binding var countdownSeconds: Int
-    @Binding var burnInTimer: Bool
     let onContinue: () -> Void
 
     private let countdownOptions = [0, 3, 5, 10]
@@ -15,34 +14,26 @@ struct SetupView: View {
             Color.black
                 .ignoresSafeArea()
 
-            frameGuide
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
                     header
 
                     neonCard(title: "TIMER MINUTES") {
-                        HStack {
-                            Button {
-                                timerMinutes = max(0, timerMinutes - 1)
-                            } label: {
-                                stepperButtonLabel("−")
+                        Picker("Timer Minutes", selection: $timerMinutes) {
+                            ForEach(0...59, id: \.self) { minute in
+                                Text("\(minute) MIN")
+                                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(neonGreen)
+                                    .tag(minute)
                             }
-
-                            Spacer()
-
-                            Text("\(timerMinutes) MIN")
-                                .font(.system(size: 30, weight: .bold, design: .monospaced))
-                                .foregroundStyle(neonGreen)
-                                .monospacedDigit()
-
-                            Spacer()
-
-                            Button {
-                                timerMinutes = min(59, timerMinutes + 1)
-                            } label: {
-                                stepperButtonLabel("+")
-                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
+                        .clipped()
+                        .tint(neonGreen)
+                        .overlay {
+                            Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.2)
                         }
                     }
 
@@ -52,16 +43,6 @@ struct SetupView: View {
 
                     neonCard(title: "TIMER POSITION") {
                         segmentedCorner
-                    }
-
-                    neonCard(title: "EXPORT") {
-                        Toggle(isOn: $burnInTimer) {
-                            Text("BURN TIMER INTO VIDEO")
-                                .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(neonGreen)
-                        }
-                        .toggleStyle(.switch)
-                        .tint(neonGreen)
                     }
 
                     Text("FORMAT: M:SS.SSS COUNT UP")
@@ -169,14 +150,6 @@ struct SetupView: View {
         .neonGlow(color: neonGreen)
     }
 
-    private var frameGuide: some View {
-        RoundedRectangle(cornerRadius: 0)
-            .stroke(neonGreen.opacity(0.75), lineWidth: 1.4)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 108)
-            .allowsHitTesting(false)
-            .neonGlow(color: neonGreen, radius: 2.2)
-    }
 
     private func neonCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -194,16 +167,6 @@ struct SetupView: View {
         .neonGlow(color: neonGreen, radius: 1.8)
     }
 
-    private func stepperButtonLabel(_ symbol: String) -> some View {
-        Text(symbol)
-            .font(.system(size: 28, weight: .bold, design: .monospaced))
-            .foregroundStyle(neonGreen)
-            .frame(width: 52, height: 42)
-            .background(Color.black.opacity(0.85))
-            .overlay {
-                Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.2)
-            }
-    }
 
     private func cornerShortLabel(_ corner: TimerOverlayCorner) -> String {
         switch corner {
