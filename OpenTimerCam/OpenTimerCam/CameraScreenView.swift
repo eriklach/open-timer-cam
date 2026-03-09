@@ -224,10 +224,6 @@ struct CameraScreenView: View {
                     viewModel.discardPendingRecording()
                 }
             }
-
-            dialogButton(title: "CANCEL", isFilled: false) {
-                viewModel.shouldPresentSaveDialog = false
-            }
         }
         .padding(16)
         .frame(maxWidth: 340)
