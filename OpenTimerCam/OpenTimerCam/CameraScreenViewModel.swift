@@ -12,6 +12,7 @@ final class CameraScreenViewModel: ObservableObject {
     @Published var pendingExportURL: URL?
     @Published var shouldPresentSaveDialog = false
     @Published var isStoppingRecording = false
+    @Published var isExporting = false
 
     let recorder = CameraRecorder()
     let timerManager = TimerManager()
@@ -115,6 +116,11 @@ final class CameraScreenViewModel: ObservableObject {
 
             let rawURL = try await recorder.stopRecording()
             if shouldBurnInTimer {
+                isExporting = true
+                defer {
+                    isExporting = false
+                }
+
                 statusMessage = "Burning timer into video..."
                 let finalURL = try await exporter.exportVideoWithTimer(
                     inputURL: rawURL,

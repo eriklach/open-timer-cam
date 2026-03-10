@@ -40,10 +40,14 @@ struct CameraScreenView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
             }
-            .allowsHitTesting(!isShowingCustomDialog)
+            .allowsHitTesting(!isShowingBlockingOverlay)
 
             if let countdown = viewModel.prestartCountdownDisplay {
                 prestartCountdownOverlay(countdown)
+            }
+
+            if viewModel.isExporting {
+                savingOverlay
             }
 
             if isShowingCustomDialog {
@@ -210,6 +214,37 @@ struct CameraScreenView: View {
         .neonGlow(color: neonGreen)
     }
 
+
+    private var savingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(neonGreen)
+
+                Text("SAVING RECORDING…")
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundStyle(neonGreen)
+
+                Text("LONGER RECORDINGS TAKE LONGER TO BURN IN")
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .foregroundStyle(neonGreen.opacity(0.86))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 360)
+            .background(Color.black.opacity(0.9))
+            .overlay {
+                Rectangle().stroke(neonGreen.opacity(0.95), lineWidth: 1.4)
+            }
+            .neonGlow(color: neonGreen)
+        }
+    }
+
     private var saveDialog: some View {
         VStack(spacing: 14) {
             Text("SAVE RECORDING?")
@@ -287,6 +322,10 @@ struct CameraScreenView: View {
 
     private var isShowingCustomDialog: Bool {
         shouldConfirmLeaving || viewModel.shouldPresentSaveDialog
+    }
+
+    private var isShowingBlockingOverlay: Bool {
+        isShowingCustomDialog || viewModel.isExporting
     }
 
     private var canToggleRecording: Bool {
