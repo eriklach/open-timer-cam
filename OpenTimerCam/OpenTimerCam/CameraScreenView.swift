@@ -9,10 +9,11 @@ struct CameraScreenView: View {
 
     private let neonGreen = Color(red: 0.06, green: 0.98, blue: 0.56)
 
-    init(corner: TimerOverlayCorner, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool, onBackToSetup: @escaping () -> Void) {
+    init(corner: TimerOverlayCorner, cameraPosition: CameraPositionOption, countdownDuration: TimeInterval, prestartCountdownSeconds: Int, shouldBurnInTimer: Bool, onBackToSetup: @escaping () -> Void) {
         _viewModel = StateObject(
             wrappedValue: CameraScreenViewModel(
                 corner: corner,
+                cameraPosition: cameraPosition,
                 countdownDuration: countdownDuration,
                 prestartCountdownSeconds: prestartCountdownSeconds,
                 shouldBurnInTimer: shouldBurnInTimer

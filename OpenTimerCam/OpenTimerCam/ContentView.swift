@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var didContinue = false
     @AppStorage("setup.selectedCorner") private var selectedCornerRawValue = TimerOverlayCorner.topTrailing.rawValue
+    @AppStorage("setup.cameraPosition") private var selectedCameraPositionRawValue = CameraPositionOption.rear.rawValue
     @AppStorage("setup.timerMinutes") private var timerMinutes = 0
     @AppStorage("setup.countdownSeconds") private var countdownSeconds = 10
 
@@ -13,11 +14,19 @@ struct ContentView: View {
         )
     }
 
+    private var selectedCameraPositionBinding: Binding<CameraPositionOption> {
+        Binding(
+            get: { CameraPositionOption(rawValue: selectedCameraPositionRawValue) ?? .rear },
+            set: { selectedCameraPositionRawValue = $0.rawValue }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             if didContinue {
                 CameraScreenView(
                     corner: selectedCornerBinding.wrappedValue,
+                    cameraPosition: selectedCameraPositionBinding.wrappedValue,
                     countdownDuration: TimeInterval(timerMinutes * 60),
                     prestartCountdownSeconds: countdownSeconds,
                     shouldBurnInTimer: true,
@@ -26,6 +35,7 @@ struct ContentView: View {
             } else {
                 SetupView(
                     selectedCorner: selectedCornerBinding,
+                    selectedCameraPosition: selectedCameraPositionBinding,
                     timerMinutes: $timerMinutes,
                     countdownSeconds: $countdownSeconds
                 ) {
